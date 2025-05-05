@@ -1,23 +1,21 @@
-# combined_chatbot_sender.py
 
-import socket
-import time
-import sqlite3
-from datetime import datetime
-import os
-import atexit
+# Thư viện cơ bản và mạng
+import socket             # Kết nối mạng (client-server)
+import time               # Các hàm liên quan đến thời gian (lấy giờ,ngày tháng)
+import sqlite3            # Làm việc với CSDL SQLite
+from datetime import datetime # Xử lý ngày và giờ
+import os                 # Tương tác với hệ điều hành (file, thư mục)
+import atexit             # Đăng ký hàm chạy khi chương trình thoát
 
 # Thư viện cho Chatbot
-from textblob import TextBlob
-import google.generativeai as genai
-from gtts import gTTS
-import pygame # Pygame cần được cài đặt: pip install pygame
-from underthesea import word_tokenize
-from playsound import playsound # Import thư viện playsound
+import google.generativeai as genai  # Tương tác với Google AI (Gemini)
+from gtts import gTTS # Chuyển văn bản thành giọng nói (Google TTS)
+import pygame 
+from underthesea import word_tokenize # Tách từ tiếng Việt
 
-import webbrowser #Mở website
-import re
-import speech_recognition as sr
+import webbrowser         # Mở trình duyệt web
+import re                 # tìm kiếm/khớp mẫu văn bản
+import speech_recognition as sr # Nhận dạng giọng nói (Speech-to-Text) - Cần cài: pip install SpeechRecognition
 
 # --- Cấu hình ---
 # Chatbot
@@ -34,8 +32,6 @@ speaking = True # Biến kiểm soát việc phát âm
 # --- Cấu hình âm thanh ---
 # Lấy thư mục chứa file Python hiện tại
 script_directory = os.path.dirname(os.path.abspath(__file__))
-# Giả sử thư mục SOUND nằm CÙNG CẤP với file script này
-# (Nếu nó nằm trong thư mục con, ví dụ 'assets/SOUND', hãy thay đổi cho phù hợp)
 SOUND_FOLDER = os.path.join(script_directory, "SOUND") # <<< Đảm bảo thư mục tên 'SOUND' tồn tại
 
 # Tạo đường dẫn đầy đủ đến các file âm thanh
@@ -43,12 +39,11 @@ HAPPY_SOUND_PATH = os.path.join(SOUND_FOLDER, "haha.wav") # <<< Đảm bảo fil
 SAD_SOUND_PATH = os.path.join(SOUND_FOLDER, "saddd.wav") # <<< Đảm bảo file saddd.wav tồn tại
 # --- Kết thúc cấu hình ---
 
-# --- Khởi tạo Pygame Mixer MỘT LẦN ---
+# # --- Khởi tạo Pygame Mixer MỘT LẦN ---
 try:
     pygame.mixer.init()
-    print("Pygame mixer initialized successfully.")
 except pygame.error as e:
-    print(f"Fatal Error: Could not initialize pygame mixer: {e}") 
+    print(f"Khởi tạo thất bại: {e}") 
 
 # Hàm nhận giọng nói từ micrô
 def listen_to_mic():
@@ -237,7 +232,7 @@ def initialize_database():
             )
         ''')
         conn.commit()
-        print(f"Database '{DATABASE_FILE}' đã được khởi tạo/kết nối.")
+        # print(f"Database '{DATABASE_FILE}' đã được khởi tạo/kết nối.")
     except sqlite3.Error as e:
         print(f"Lỗi SQLite khi khởi tạo: {e}")
     finally:
@@ -278,7 +273,7 @@ def read_all_data_from_db():
         # Lấy tất cả các hàng kết quả trả về từ câu lệnh execute
         all_data = cursor.fetchall()
 
-        print(f"Đã đọc thành công {len(all_data)} bản ghi từ database.")
+        # print(f"Đã đọc thành công {len(all_data)} bản ghi từ database.")
 
     except sqlite3.Error as e:
         print(f"Lỗi SQLite khi đọc dữ liệu: {e}")
@@ -291,7 +286,6 @@ def read_all_data_from_db():
     return all_data
 
 # --- Hàm gửi dữ liệu tới ESP32 ---
-# Chúng ta đưa logic gửi vào hàm riêng để dễ gọi và quản lý socket
 client_socket = None # Biến toàn cục để giữ kết nối socket
 
 def send_to_esp32(data_to_send):
@@ -309,9 +303,9 @@ def send_to_esp32(data_to_send):
             client_socket.settimeout(None) # Bỏ timeout sau khi kết nối
         except (socket.timeout, socket.error) as conn_err:
             print(f"Lỗi kết nối ESP32: {conn_err}")
-            log_data_to_db(f"Connection Error: {conn_err}", status="Error")
+            # log_data_to_db(f"Connection Error: {conn_err}", status="Error")
             client_socket = None # Đặt lại để thử lại lần sau
-            log_data_to_db(data_to_send, status="Failed (No Connection)") # Ghi log dữ liệu không gửi được
+            # log_data_to_db(data_to_send, status="Failed (No Connection)") # Ghi log dữ liệu không gửi được
             return False # Trả về False nếu không kết nối được
 
     # Bước 2: Gửi dữ liệu nếu đang có kết nối
@@ -319,27 +313,27 @@ def send_to_esp32(data_to_send):
         try:
             print(f"--> Đang gửi tới ESP32: {data_to_send}")
             client_socket.sendall(data_to_send.encode('utf-8') + b'\n')
-            log_data_to_db(data_to_send, status="Sent OK")
+            # log_data_to_db(data_to_send, status="Sent OK")
             is_sent = True # Đánh dấu đã gửi thành công
         except socket.error as send_err:
             print(f"Lỗi khi gửi tới ESP32: {send_err}. Đang đóng kết nối.")
-            log_data_to_db(f"Send Error: {send_err}", status="Error")
+            # log_data_to_db(f"Send Error: {send_err}", status="Error")
             try:
                 client_socket.close() # Cố gắng đóng socket cũ
             except:
                 pass # Bỏ qua nếu đóng cũng lỗi
             client_socket = None # Đặt lại để thử kết nối lại lần sau
-            log_data_to_db(data_to_send, status="Failed (Send Error)") # Ghi log dữ liệu không gửi được
+            # log_data_to_db(data_to_send, status="Failed (Send Error)") # Ghi log dữ liệu không gửi được
             is_sent = False # Đánh dấu gửi thất bại
         except Exception as e:
              print(f"Lỗi không xác định khi gửi: {e}")
-             log_data_to_db(f"Unknown Send Error: {e}", status="Error")
+            #  log_data_to_db(f"Unknown Send Error: {e}", status="Error")
              try:
                 client_socket.close()
              except:
                 pass
              client_socket = None
-             log_data_to_db(data_to_send, status="Failed (Unknown Send Error)")
+            #  log_data_to_db(data_to_send, status="Failed (Unknown Send Error)")
              is_sent = False
 
     return is_sent # Trả về True nếu gửi thành công, False nếu thất bại
@@ -386,12 +380,38 @@ def open_website(text):
         webbrowser.open(url)
         return "Đang mở "+ domain + "!!!"
 
+def get_relevant_history(max_messages=30):
+    conn = None
+    history_context = []
+    try:
+        conn = sqlite3.connect(DATABASE_FILE)
+        cursor = conn.cursor()
+        # Lấy vài tin nhắn gần nhất có "tôi" (Ví dụ)
+        cursor.execute("""
+            SELECT data_sent 
+            FROM data_log 
+            ORDER BY timestamp DESC 
+            LIMIT ?
+        """, (max_messages,)) ## WHERE data_sent LIKE '%tôi%'
+        rows = cursor.fetchall()
+        # Có thể cần định dạng lại cho phù hợp với API
+        history_context = [row[0] for row in rows] 
+        history_context.reverse() # Đảo ngược để theo thứ tự thời gian
+    except sqlite3.Error as e:
+        print(f"Lỗi SQLite khi đọc lịch sử: {e}")
+    finally:
+        if conn:
+            conn.close()
+    # Trả về dưới dạng một chuỗi hoặc danh sách phù hợp
+    return "\n".join(history_context) # Hoặc trả về list để xử lý tiếp
+
 atexit.register(cleanup) # Đăng ký hàm cleanup
 
 # --- Khởi tạo và Vòng lặp chính ---
 if __name__ == "__main__":
     initialize_database() # Khởi tạo DB
     cleaned_response = ''
+    num_message = 0
     # Cấu hình Google Generative AI
     try:
         genai.configure(api_key=GOOGLE_API_KEY)
@@ -407,9 +427,7 @@ if __name__ == "__main__":
     while True:
         try:
             message = input('You: ') # Nhập bằng tay
-            # message = listen_to_mic()# Nói 
-            
-            
+            # message = listen_to_mic()# Nói       
             if message is None:
                 # Nếu không nhận diện được giọng nói, hoặc có lỗi,
                 # thì bỏ qua lần lặp này và lắng nghe lại.
@@ -427,6 +445,7 @@ if __name__ == "__main__":
                 pygame.mixer.music.stop() # Dừng phát nhạc ngay lập tức
                 continue # Tiếp tục vòng lặp mà không phát âm thanh
 
+            # update_data_chatbot()#update dữ liệu cho chatbot
             # Gửi tin nhắn đến Chatbot và xử lý
             try:
                 if "tay trái" in text : #điều khiển tay trái
@@ -460,24 +479,28 @@ if __name__ == "__main__":
                         limited_response = "Đang mở trang web điều khiển"
                     else:
                         limited_response = open_website(text)
+                elif "lưu lại" in text: #đọc dữ liệu trên database
+                    message_save = message.replace(" lưu lại", "").replace(" dữ liệu này", "")
+                    message_speak = message_save.replace("tôi", "bạn")
+                    limited_response = "Đã lưu dữ liệu " + message_speak + " vào database"
+                    log_data_to_db(message_save, status="Sent OK")
                 elif "data" in text: #đọc dữ liệu trên database
                     limited_response = "Dữ liệu từ database"
                     print("\n--- Đọc dữ liệu từ DB ---")
-                    retrieved_logs = read_all_data_from_db()
-                    # In dữ liệu đã đọc
-                    if retrieved_logs:
-                        print("\n--- Dữ liệu đã đọc ---")
-                        for row in retrieved_logs:
-                            # Mỗi 'row' là một tuple chứa các giá trị của một hàng
-                            # theo thứ tự các cột trong câu lệnh SELECT
-                            # (id, timestamp, data_sent, status)
-                            print(f"ID: {row[0]}, Thời gian: {row[1]}, Dữ liệu: {row[2]}, Trạng thái: {row[3]}")
-                            # cập nhật dữ liệu tôi tên Bảo sinh năm 2003. học trường tdtu. cao 1m7 khi nào tôi hỏi thì mới trả lời. bây giờ trả lời câu hỏi của tôi với tư cách tôi là người lạ.  Xin chào
-                    else:
-                        print("Không có dữ liệu nào trong database")
+                    data_saved = get_relevant_history()
+                    response = chat.send_message(data_saved)
+                    print(data_saved)
                 else:
-                    response = chat.send_message(message + ' .Trả lời ngắn gọn') ##' .Trả lời ngắn gọn'
-                    limited_response = limit_characters(response.text.replace("*", ""), max_chars=400)
+                    context = get_relevant_history() 
+                    # print(context)
+                    num_message = num_message + 1
+                    # print(f"Câu hỏi thứ: {num_message}")
+                    if num_message == 1:
+                        full_prompt = f"Lưu dữ liệu này lại khi nào hỏi thì mới trả lời: '{context}'.\nHãy trả lời câu hỏi sau một cách ngắn gọn: {message}"
+                    else:
+                        full_prompt = message + ' .Trả lời ngắn gọn'         ##' .Trả lời ngắn gọn'
+                    response = chat.send_message(full_prompt)
+                    limited_response = limit_characters(response.text.replace("*", ""), max_chars=400) # giới hạn kí tự của chatbot trả lời
                     cleaned_response = response.text.replace('\n', '')
                     
                 print('ChatBot:', limited_response)
@@ -508,7 +531,7 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Lỗi trong quá trình chat hoặc gửi: {e}")
                 # Có thể log lỗi này vào DB nếu muốn
-                log_data_to_db(f"Chat/Send Process Error: {e}", status="Error")
+                # log_data_to_db(f"Chat/Send Process Error: {e}", status="Error")
 
         except KeyboardInterrupt:
              print("\nNgắt bởi người dùng. Đang thoát...")
